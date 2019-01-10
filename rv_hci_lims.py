@@ -24,7 +24,7 @@ def get_rv_epochs(star):
     
     rvDir = '/Users/annaboehle/research/data/rv/'
 
-    file_ls = glob.glob('{:s}{:s}/{:s}_resid*.rdb'.format(rvDir,star,star))
+    file_ls = glob.glob('{:s}{:s}/{:s}*Residuals.rdb'.format(rvDir,star,star))
     rv_epochs = []
     for f in file_ls:
         rv_tab = ascii.read(f)
@@ -37,11 +37,17 @@ def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
 
     # get contrast limits versus projected sep for star
     f = h5py.File(rootDir + dataDirs[star] + 'PynPoint_database.hdf5','r')
-    
+
     contrast_tag_inner = "{:s}_lprime_contrast_limits_stack{:02d}_pca{:02d}_0.1delr".format(star, stack, n)
-    contrast_tag_outer = "{:s}_lprime_contrast_limits_stack{:02d}_adi".format(star, stack)
-    seps = np.concatenate((f[contrast_tag_inner][:,0],f[contrast_tag_outer][:,0]))
-    contr = np.concatenate((f[contrast_tag_inner][:,1],f[contrast_tag_outer][:,1]))
+    if star != '40_eri':
+        if star in ['tau_ceti','hd42581']:
+            stack = 10
+        contrast_tag_outer = "{:s}_lprime_contrast_limits_stack{:02d}_adi".format(star, stack)            
+        seps = np.concatenate((f[contrast_tag_inner][:,0],f[contrast_tag_outer][:,0]))
+        contr = np.concatenate((f[contrast_tag_inner][:,1],f[contrast_tag_outer][:,1]))
+    else:
+        seps = f[contrast_tag_inner][:,0]
+        contr = f[contrast_tag_inner][:,1]
     
     f.close()
 
@@ -54,7 +60,9 @@ def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
 
     return f_masslimvsep, seps
     
-def sample_orbits(test=True):
+def sample_orbits(star,
+                  nsamples = 10000,
+                  test=True):
 
     # read in info tables
     star_info = ascii.read('/Users/annaboehle/research/code/directimaging_code/plotting/nearest_solar_dist_age.txt')
@@ -62,20 +70,16 @@ def sample_orbits(test=True):
     obsInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/NACO_obs.dat')
     
     # get star info
-    star = 'hd36395'
     print star
-
     row_contr = np.where(contrInfo['name'] == star)[0][0]
     
     stack, p = contrInfo['stack'][row_contr],contrInfo['percen_frames'][row_contr]
-    cent_size = contrInfo['cent_size'][row_contr]
     
     row = np.where(star_info['object_name'] == contrInfo['plt_contr_name'][row_contr])[0][0]
     
     d_star = star_info['dist'][row]
     age_star = star_info['age'][row]
     mag_star = star_info['mag_star'][row]
-    t_baseline = star_info['t_baseline'][row]
     m_star = star_info['m_star'][row]
     rv_std = star_info['rv_std'][row]
 
@@ -92,8 +96,6 @@ def sample_orbits(test=True):
     e, o, t0 = 0., 0., 0.
 
     # sample i and w
-    nsamples = 10000
-
     unif = np.random.uniform(size=nsamples)
     i = np.arccos(unif)*(180./np.pi)
 
