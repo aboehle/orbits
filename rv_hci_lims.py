@@ -54,7 +54,7 @@ def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
 
     return f_masslimvsep, seps
     
-def sample_orbits():
+def sample_orbits(test=True):
 
     # read in info tables
     star_info = ascii.read('/Users/annaboehle/research/code/directimaging_code/plotting/nearest_solar_dist_age.txt')
@@ -92,7 +92,7 @@ def sample_orbits():
     e, o, t0 = 0., 0., 0.
 
     # sample i and w
-    nsamples = 100
+    nsamples = 10000
 
     unif = np.random.uniform(size=nsamples)
     i = np.arccos(unif)*(180./np.pi)
@@ -102,14 +102,20 @@ def sample_orbits():
     # for a and m_p
     del_m_p = 3.0
     del_a = 2.
-    m_p_arr = np.arange(14.5, 50, del_m_p)
+    m_p_arr = np.arange(10, 50, del_m_p)
     a_arr = np.arange(np.min(seps)*d_star, np.max(seps)*d_star,del_a)
 
     # set up plot
     fig = plt.figure(figsize=(12,5))
-    ax=plt.subplot(111)
+    ax1=plt.subplot(111)
     norm = colors.Normalize(vmin=0,vmax=100)
     scalar_map = cm.ScalarMappable(norm=norm,cmap=cm.Blues)
+
+    fig = plt.figure(figsize=(12,5))
+    ax2=plt.subplot(111)
+    
+    fig = plt.figure(figsize=(12,5))
+    ax3=plt.subplot(111)
     
     for a in a_arr:
         for m_p in m_p_arr:
@@ -135,20 +141,59 @@ def sample_orbits():
                                             units = 'arcsec',
                                             solve_kepler=False)
 
-            # get projected separations
+            # get frac detected for imaging
             proj_sep = (x_ast.flatten()**2. + y_ast.flatten()**2.)**0.5
             mass_lims = f_masslimvsep(proj_sep)
-    
-            frac_detected_hci = len(np.where(m_p > mass_lims)[0])/float(nsamples)
 
-            #plt.scatter(a, m_p)
+            idx_detected_hci = np.where(m_p > mass_lims)[0]
+            frac_detected_hci = len(idx_detected_hci)/float(nsamples)
+
+            # get frac detected for RV
+            rv_diff = np.max(rv_rv,axis=0) - np.min(rv_rv,axis=0)
+
+            idx_detected_rv = np.where(rv_diff > 5*rv_std)[0]
+            idx_notdetected_rv = np.where(rv_diff <= 5*rv_std)[0]
+            frac_detected_rv = len(idx_detected_rv)/float(nsamples)
+
+            if test:
+                if a == a_arr[10] and m_p == m_p_arr[0]:
+                    plt.figure()
+                    plt.hist(rv_diff)
+                    plt.figure()
+                    plt.errorbar(t_rv,rv_rv[:,idx_notdetected_rv[10]],marker='o',yerr=rv_std)
+
+            # get frac detected either or
+            idx_detected_rvorhci = np.where( (rv_diff > 5*rv_std) | (m_p > mass_lims) )[0]
+            frac_detected_rvorhci = len(idx_detected_rvorhci)/float(nsamples)
+                    
+            # plot imaging
             rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
                               del_a,del_m_p,
                               facecolor=scalar_map.to_rgba(frac_detected_hci*100.),edgecolor='black')
-            ax.add_patch(rect)
-            plt.scatter(a,m_p)
+            ax1.add_patch(rect)
+            ax1.scatter(a,m_p)
+
+            ax1.text(a, m_p, '{:2.0f}'.format(frac_detected_hci*100.),
+                     verticalalignment='center',horizontalalignment='center')
+
+            # plot RV
+            rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
+                              del_a,del_m_p,
+                              facecolor=scalar_map.to_rgba(frac_detected_rv*100.),edgecolor='black')
+            ax2.add_patch(rect)
+            ax2.scatter(a,m_p)
             
-            plt.text(a, m_p, '{:2.0f}'.format(frac_detected_hci*100.),
+            ax2.text(a, m_p, '{:2.0f}'.format(frac_detected_rv*100.),
+                     verticalalignment='center',horizontalalignment='center')
+
+            # plot both!
+            rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
+                              del_a,del_m_p,
+                              facecolor=scalar_map.to_rgba(frac_detected_rvorhci*100.),edgecolor='black')
+            ax3.add_patch(rect)
+            ax3.scatter(a,m_p)
+            
+            ax3.text(a, m_p, '{:2.0f}'.format(frac_detected_rvorhci*100.),
                      verticalalignment='center',horizontalalignment='center')
 
             # ultimately: frac detected by one method OR the other
