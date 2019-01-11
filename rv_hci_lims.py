@@ -58,7 +58,7 @@ def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
     
     f_masslimvsep = scipy.interpolate.interp1d(seps,mass_lims,bounds_error=False,fill_value=np.inf)  # outside bounds planets cannot be detected!
 
-    return f_masslimvsep, seps
+    return f_masslimvsep, seps, mass_lims
     
 def sample_orbits(star,
                   nsamples = 10000,
@@ -90,7 +90,7 @@ def sample_orbits(star,
     n = int(np.round(p*obsInfo['nframes'][row_obs]/stack))
 
     # get mass limits v projected sep for star
-    f_masslimvsep, seps = get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n)
+    f_masslimvsep, seps, mass_lims = get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n)
     
     # fix orbital parameters to 0
     e, o, t0 = 0., 0., 0.
@@ -104,8 +104,8 @@ def sample_orbits(star,
     # for a and m_p
     del_m_p = 3.0
     del_a = 2.
-    m_p_arr = np.arange(10, 50, del_m_p)
-    a_arr = np.arange(np.min(seps)*d_star, np.max(seps)*d_star,del_a)
+    m_p_arr = np.arange(np.ma.min(np.ma.masked_invalid(mass_lims))-5.0, 50, del_m_p)
+    a_arr = np.arange(np.min(seps)*d_star, np.max(seps)*d_star+18.0,del_a)
 
     # set up plot
     fig = plt.figure(figsize=(12,5))
@@ -118,6 +118,11 @@ def sample_orbits(star,
     
     fig = plt.figure(figsize=(12,5))
     ax3=plt.subplot(111)
+
+    fig = plt.figure(figsize=(12,5))
+    ax4=plt.subplot(111)
+    norm = colors.Normalize(vmin=0,vmax=100)
+    scalar_map_diff = cm.ScalarMappable(norm=norm,cmap=cm.Greens)
     
     for a in a_arr:
         for m_p in m_p_arr:
@@ -198,10 +203,20 @@ def sample_orbits(star,
             ax3.text(a, m_p, '{:2.0f}'.format(frac_detected_rvorhci*100.),
                      verticalalignment='center',horizontalalignment='center')
 
+            # plot difference!
+            rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
+                              del_a,del_m_p,
+                              facecolor=scalar_map_diff.to_rgba((frac_detected_rvorhci-frac_detected_rv)*100.),edgecolor='black')
+            ax4.add_patch(rect)
+            ax4.scatter(a,m_p)
+
+            ax4.text(a, m_p, '{:2.0f}'.format((frac_detected_rvorhci-frac_detected_rv)*100.),
+                     verticalalignment='center',horizontalalignment='center')
+
             # ultimately: frac detected by one method OR the other
-            
+
     plt.show()        
-                            
+
     # get max delta v in the rv time window
 
     #plt.figure()
