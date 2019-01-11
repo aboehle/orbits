@@ -22,9 +22,9 @@ dataDirs = {'tau_ceti': 'tau_ceti_lprime/data_with_raw_calibs_newpipeline/',
 
 def get_rv_epochs(star):
     
-    rvDir = '/Users/annaboehle/research/data/rv/'
+    rvDir = '/Users/annaboehle/research/data/rv/dace/nightly_binning'
 
-    file_ls = glob.glob('{:s}{:s}/{:s}*Residuals.rdb'.format(rvDir,star,star))
+    file_ls = glob.glob('{:s}/{:s}/{:s}*Residuals.rdb'.format(rvDir,star,star))
     rv_epochs = []
     for f in file_ls:
         rv_tab = ascii.read(f)
