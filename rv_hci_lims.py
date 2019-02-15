@@ -2,10 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib import cm,colors
+import matplotlib.gridspec as gridspec
 import scipy
 from astropy.io import ascii
 import h5py
 import glob
+from plotting.usetextrue import *
 
 import orbits.kepler as k
 from plotting.plot_contrastcurve import calc_limitingmass
@@ -31,8 +33,10 @@ def get_rv_epochs(star):
         #rv_epochs.append(ascii.read(f))
         rv_epochs.extend(rv_tab['rjd'][1:])
 
-    return np.array(rv_epochs,dtype=float) + 2400000 
-    
+    print 'Number of RV epochs:',len(np.array(rv_epochs,dtype=float))
+        
+    return np.array(rv_epochs,dtype=float) + 2400000
+
 def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
 
     # get contrast limits versus projected sep for star
@@ -61,8 +65,11 @@ def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
     return f_masslimvsep, seps, mass_lims
     
 def sample_orbits(star,
+                  age = 'nominal',
                   nsamples = 10000,
-                  test=True):
+                  test=True,
+                  plot_text=False,
+                  fig_ax_ls=[]):
 
     # read in info tables
     star_info = ascii.read('/Users/annaboehle/research/code/directimaging_code/plotting/nearest_solar_dist_age.txt')
@@ -75,10 +82,18 @@ def sample_orbits(star,
     
     stack, p = contrInfo['stack'][row_contr],contrInfo['percen_frames'][row_contr]
     
-    row = np.where(star_info['object_name'] == contrInfo['plt_contr_name'][row_contr])[0][0]
+    row = np.where(star_info['object_name'] == star)[0][0]
     
     d_star = star_info['dist'][row]
-    age_star = star_info['age'][row]
+    if age == 'nominal':
+        age_star = star_info['age'][row]
+    elif age == 'min':
+        age_star = star_info['age_min'][row]
+    elif age == 'max':
+        age_star = star_info['age_max'][row]
+    else:
+        raise ValueError('age should be "nominal", "min", or "max"!')
+    
     mag_star = star_info['mag_star'][row]
     m_star = star_info['m_star'][row]
     rv_std = star_info['rv_std'][row]
@@ -98,31 +113,62 @@ def sample_orbits(star,
     # sample i and w
     unif = np.random.uniform(size=nsamples)
     i = np.arccos(unif)*(180./np.pi)
+    #i = np.zeros(nsamples) + 20.
 
     w = np.random.uniform(size=nsamples, low=0, high=360.)
 
     # for a and m_p
     del_m_p = 3.0
     del_a = 2.
-    m_p_arr = np.arange(np.ma.min(np.ma.masked_invalid(mass_lims))-5.0, 50, del_m_p)
-    a_arr = np.arange(np.min(seps)*d_star, np.max(seps)*d_star+18.0,del_a)
+    if test:
+        a_arr = [22]
+        m_p_arr = [15]
+    else:
+        #m_p_arr = np.arange(np.ma.min(np.ma.masked_invalid(mass_lims))-5.0, 50, del_m_p)
+        m_p_arr = np.arange(del_m_p/2., 50, del_m_p)
+        
+        #a_arr = np.arange(np.min(seps)*d_star, np.max(seps)*d_star+18.0,del_a)
+        #a_arr = np.arange(np.min(seps)*d_star, np.max(seps)*d_star*4.0,del_a)
+        if star == '40_eri':
+            a_arr = np.arange(del_a/2., np.max(seps)*d_star*4.0,del_a)
+        else:
+            a_arr = np.arange(del_a/2., np.max(seps)*d_star*2.0,del_a)
+    print m_p_arr,'M_J'
+    print a_arr,'AU'
 
     # set up plot
-    fig = plt.figure(figsize=(12,5))
-    ax1=plt.subplot(111)
+    usetexTrue()
+
+    if not fig_ax_ls:
+        fig = plt.figure(figsize=(12,18))  #(12,14)
+        gs = gridspec.GridSpec(4, 1)
+        gs_cbar = gridspec.GridSpec(4,1) 
+        gs.update(left=0.1,top=0.97,bottom=0.075,hspace=0.25,right=0.83,wspace=0.3)
+        gs_cbar.update(top=0.97,bottom=0.075,left=0.86,right=0.88,hspace=0.25)
+    
+        ax1=plt.subplot(gs[0])    
+        ax2=plt.subplot(gs[1])
+        ax3=plt.subplot(gs[2])
+        ax4=plt.subplot(gs[3])
+    else:
+        fig,ax1,ax2,ax3,ax4 = fig_ax_ls
+
     norm = colors.Normalize(vmin=0,vmax=100)
     scalar_map = cm.ScalarMappable(norm=norm,cmap=cm.Blues)
-
-    fig = plt.figure(figsize=(12,5))
-    ax2=plt.subplot(111)
-    
-    fig = plt.figure(figsize=(12,5))
-    ax3=plt.subplot(111)
-
-    fig = plt.figure(figsize=(12,5))
-    ax4=plt.subplot(111)
+        
     norm = colors.Normalize(vmin=0,vmax=100)
     scalar_map_diff = cm.ScalarMappable(norm=norm,cmap=cm.Greens)
+
+    dtype = np.dtype([('a','float'),
+                      ('m_p','float'),
+                      ('frac_detected_hci','float'),
+                      ('frac_detected_rv','float'),
+                      ('frac_detected_rvorhci','float'),
+                      ('frac_rvhcidiff','float'),                      
+                      ])
+    
+    #out_arr = np.zeros((len(m_p_arr)*len(a_arr), ))  # cols: a, m_p, frac_hci, frac_rv, frac_hciorrv, frac_hcinotrv
+    out_arr = []
     
     for a in a_arr:
         for m_p in m_p_arr:
@@ -162,17 +208,17 @@ def sample_orbits(star,
             idx_notdetected_rv = np.where(rv_diff <= 5*rv_std)[0]
             frac_detected_rv = len(idx_detected_rv)/float(nsamples)
 
-            if test:
-                if a == a_arr[10] and m_p == m_p_arr[0]:
-                    plt.figure()
-                    plt.hist(rv_diff)
-                    plt.figure()
-                    plt.errorbar(t_rv,rv_rv[:,idx_notdetected_rv[10]],marker='o',yerr=rv_std)
+            #if test:
+            #    if a == a_arr[10] and m_p == m_p_arr[0]:
+            #        plt.figure()
+            #        plt.hist(rv_diff)
+            #        plt.figure()
+            #        plt.errorbar(t_rv,rv_rv[:,idx_notdetected_rv[10]],marker='o',yerr=rv_std)
 
             # get frac detected either or
             idx_detected_rvorhci = np.where( (rv_diff > 5*rv_std) | (m_p > mass_lims) )[0]
             frac_detected_rvorhci = len(idx_detected_rvorhci)/float(nsamples)
-                    
+
             # plot imaging
             rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
                               del_a,del_m_p,
@@ -180,18 +226,13 @@ def sample_orbits(star,
             ax1.add_patch(rect)
             ax1.scatter(a,m_p)
 
-            ax1.text(a, m_p, '{:2.0f}'.format(frac_detected_hci*100.),
-                     verticalalignment='center',horizontalalignment='center')
-
             # plot RV
             rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
-                              del_a,del_m_p,
-                              facecolor=scalar_map.to_rgba(frac_detected_rv*100.),edgecolor='black')
+                                del_a,del_m_p,
+                                facecolor=scalar_map.to_rgba(frac_detected_rv*100.),edgecolor='black')
             ax2.add_patch(rect)
             ax2.scatter(a,m_p)
-            
-            ax2.text(a, m_p, '{:2.0f}'.format(frac_detected_rv*100.),
-                     verticalalignment='center',horizontalalignment='center')
+
 
             # plot both!
             rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
@@ -199,9 +240,6 @@ def sample_orbits(star,
                               facecolor=scalar_map.to_rgba(frac_detected_rvorhci*100.),edgecolor='black')
             ax3.add_patch(rect)
             ax3.scatter(a,m_p)
-            
-            ax3.text(a, m_p, '{:2.0f}'.format(frac_detected_rvorhci*100.),
-                     verticalalignment='center',horizontalalignment='center')
 
             # plot difference!
             rect = Rectangle( (a-del_a/2.,m_p-del_m_p/2.),
@@ -210,19 +248,171 @@ def sample_orbits(star,
             ax4.add_patch(rect)
             ax4.scatter(a,m_p)
 
-            ax4.text(a, m_p, '{:2.0f}'.format((frac_detected_rvorhci-frac_detected_rv)*100.),
-                     verticalalignment='center',horizontalalignment='center')
+            if test:
+                if (frac_detected_rvorhci-frac_detected_rv)*100. > 3:
+                    idx_detected_hci_notrv =np.where( (rv_diff < 5*rv_std) & (m_p > mass_lims) )[0]
+                    print len(idx_detected_hci_notrv)
+                    print
+
+                    idx_sort = np.argsort(t_rv)
+                    turning_pt_idx = []
+                    no_turning_idx = []                    
+                    for idx in idx_detected_hci_notrv:
+                        if nsamples <= 100:
+                            plt.figure(2)
+                            plt.plot(t_rv,rv_rv[:,idx]-rv_rv[:,idx][0],marker='.',linestyle='none')#,yerr=rv_std)
+                                             
+                        if not np.isclose(rv_diff[idx],np.abs(rv_rv[:,idx][idx_sort][0] - rv_rv[:,idx][idx_sort][-1])):
+                            turning_pt_idx.append(idx)
+                        else:
+                            no_turning_idx.append(idx)
+
+                    turning_pt_allidx = []
+                    no_turning_allidx = []
+                    for idx in range(nsamples):
+                                             
+                        if not np.isclose(rv_diff[idx],np.abs(rv_rv[:,idx][idx_sort][0] - rv_rv[:,idx][idx_sort][-1])):
+                            turning_pt_allidx.append(idx)
+                        else:
+                            no_turning_allidx.append(idx)
+                            
+                    turning_pt_idx = np.array(turning_pt_idx,dtype=int)
+                    no_turning_idx = np.array(no_turning_idx,dtype=int)                    
+                    turning_pt_allidx = np.array(turning_pt_allidx,dtype=int)
+                    no_turning_allidx = np.array(no_turning_allidx,dtype=int)                    
+                            
+                    print '% of RV curves with turning pt = {:2.2f}'.format(len(turning_pt_idx)/float(len(idx_detected_hci_notrv))*100.)
+
+                    print a/d_star, '= max sep'
+                    #print proj_sep[idx_detected_hci_notrv]
+                    #print i[idx_detected_hci_notrv]
+
+                    plt.figure(figsize=(10,8))
+                    plt.axhline(a/d_star,color='black',label='max proj sep')
+                    plt.plot(i,proj_sep,linestyle='none',marker='o',label='all pts')
+                    plt.plot(i[turning_pt_allidx],proj_sep[turning_pt_allidx],linestyle='none',marker='o',label='yes turning in RV (all pts)')
+                    plt.plot(i[turning_pt_idx],proj_sep[turning_pt_idx],linestyle='none',marker='o',label='yes turning in RV')
+                    plt.plot(i[no_turning_idx],proj_sep[no_turning_idx],linestyle='none',marker='o',label='no turning in RV')
+                    plt.xlabel('inclination (deg)')
+                    plt.ylabel('projected sep (arcsec)')
+                    plt.ylim(5,6.1)
+                    #plt.xlim(0,60)
+                    plt.legend()
+
+
+                    plt.figure(figsize=(10,8))
+                    plt.plot(i,w,linestyle='none',marker='o',label='all pts')
+                    plt.plot(i[turning_pt_allidx],w[turning_pt_allidx],linestyle='none',marker='o',label='yes turning in RV (all pts)')               
+                    plt.plot(i[turning_pt_idx],w[turning_pt_idx],linestyle='none',marker='o',label='yes turning in RV')
+                    plt.plot(i[no_turning_idx],w[no_turning_idx],linestyle='none',marker='o',label='no turning in RV')
+                    plt.xlabel('inclination (deg)')
+                    plt.ylabel('w (deg)')
+                    plt.legend()
+
+                    plt.figure(figsize=(10,8))
+                    plt.plot(rv_diff,proj_sep,linestyle='none',marker='o',label='all pts')
+                    plt.plot(rv_diff[turning_pt_allidx],proj_sep[turning_pt_allidx],linestyle='none',marker='o',label='yes turning in RV (all pts)')                    
+                    plt.plot(rv_diff[turning_pt_idx],proj_sep[turning_pt_idx],linestyle='none',marker='o',label='yes turning in RV')
+                    plt.plot(rv_diff[no_turning_idx],proj_sep[no_turning_idx],linestyle='none',marker='o',label='no turning in RV')
+                    plt.axhline(a/d_star,color='black',label='max proj sep')                    
+                    plt.xlabel('rv diff (m/s)')
+                    plt.ylabel('projected sep (arcsec)')
+                    plt.ylim(5,6.1)
+                    #plt.xlim(0,20)
+                    plt.legend()
+
+                    plt.figure(figsize=(10,8))
+                    plt.plot(rv_diff,i,linestyle='none',marker='o',label='all pts')
+                    plt.plot(rv_diff[turning_pt_allidx],i[turning_pt_allidx],linestyle='none',marker='o',label='yes turning in RV (all pts)')
+                    plt.plot(rv_diff[turning_pt_idx],i[turning_pt_idx],linestyle='none',marker='o',label='yes turning in RV')
+                    plt.plot(rv_diff[no_turning_idx],i[no_turning_idx],linestyle='none',marker='o',label='no turning in RV')
+                    plt.xlabel('rv diff (m/s)')
+                    plt.ylabel('inclination (deg)')
+                    plt.xlim(0,12)
+                    plt.ylim(0,60)
+                    plt.legend()
+                    
+
+                    plt.figure()
+                    
+                    
+                    
+            # add text
+            fontsize = 12
+            if plot_text:                
+                
+                if (frac_detected_hci) > 0.005:
+                    #if frac_detected_hci*100. > 70:
+                    #    text_color = 'white'
+                    #else:
+                    text_color = 'black'
+                    ax1.text(a, m_p, '{:2.0f}'.format(frac_detected_hci*100.),
+                        verticalalignment='center',horizontalalignment='center',
+                        color = text_color, fontsize=fontsize)
+
+                if (frac_detected_rv) > 0.005:                    
+                    #if frac_detected_rv*100. > 70:
+                    #    text_color = 'white'
+                    #else:
+                    text_color = 'black'
+                    ax2.text(a, m_p, '{:2.0f}'.format(frac_detected_rv*100.),
+                        verticalalignment='center',horizontalalignment='center',
+                        color = text_color, fontsize=fontsize)
+
+                if (frac_detected_rvorhci) > 0.005:                    
+                    #if frac_detected_rvorhci*100. > 70:
+                    #    text_color = 'white'
+                    #else:
+                    text_color = 'black'
+                    ax3.text(a, m_p, '{:2.0f}'.format(frac_detected_rvorhci*100.),
+                        verticalalignment='center',horizontalalignment='center',
+                        color = text_color, fontsize=fontsize)
+                
+            #if ((frac_detected_rvorhci-frac_detected_rv)*100.) > 70:
+            #    text_color = 'white'
+            #else:
+                text_color = 'black'
+                if (frac_detected_rvorhci-frac_detected_rv) > 0.005:
+                    ax4.text(a, m_p, '{:2.0f}'.format((frac_detected_rvorhci-frac_detected_rv)*100.),
+                            verticalalignment='center',horizontalalignment='center',
+                            color = text_color, fontsize=fontsize)
+
+
+            out_arr.append((a,
+                            m_p,
+                            frac_detected_hci,
+                            frac_detected_rv,
+                            frac_detected_rvorhci,
+                            (frac_detected_rvorhci-frac_detected_rv),
+                            ))
 
             # ultimately: frac detected by one method OR the other
 
-    plt.show()        
+    for ax in [ax1,ax2,ax3,ax4]:
+        if ax:
+            ax.set_xlim(0,a_arr[-1]+del_a/2.)
+            ax.set_ylim(0,m_p_arr[-1]+del_m_p/2.)
+        
+    if not fig_ax_ls:
+        ax_cbar1 = fig.add_subplot(gs_cbar[1])
+        ax_cbar2 = fig.add_subplot(gs_cbar[3])
+    
+        scalar_map.set_array([])
+        scalar_map_diff.set_array([])
+        
+        fig.colorbar(scalar_map,cax=ax_cbar1,label='\% of companions detected')
+        fig.colorbar(scalar_map_diff,cax=ax_cbar2,label='Difference between\nHCI/RV combined and RV alone')
 
-    # get max delta v in the rv time window
+        for ax in [ax1,ax2,ax3,ax4]:
+            ax.set_ylabel('')
+        ax4.set_xlabel('Companion semi-major axis (AU)')
+        fig.text(0.05,0.5,'Companion mass (M$_J$)',rotation=90,horizontalalignment='center',verticalalignment='center')
 
-    #plt.figure()
-    #plt.xlabel('Projected separation')
-    #plt.hist((x_ast.flatten()**2. + y_ast.flatten()**2.)**0.5)
-    #plt.figure()
-    #plt.xlabel('RV change')
-    #plt.hist(rv_rv[0] - rv_rv[1])
-    #plt.show()
+    # write out results
+    out_arr = np.array(out_arr,dtype=dtype)
+    ascii.write(out_arr, 'hci_rv_lims/{:s}_constraints_{:s}age.dat'.format(star,age),overwrite=True,delimiter='\t')
+    
+    plt.show()
+    
+    return scalar_map, scalar_map_diff
+
