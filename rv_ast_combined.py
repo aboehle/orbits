@@ -3,26 +3,22 @@ import numpy as np
 from astropy.io import ascii
 import matplotlib.pyplot as plt
 
-def check_orbits(star = 'hd_36395',sep = 3.51613600, test=False):
+
+def check_orbits(star='hd_36395', sep=3.51613600, test=False):
 
     star_info = ascii.read('/Users/annaboehle/research/code/directimaging_code/plotting/nearest_solar_dist_age.txt')
     row = np.where(star_info['object_name'] == star)[0][0]
 
     d_star = star_info['dist'][row]
-    age_star = [star_info['age_min'][row],star_info['age_max'][row]]
-    mag_star = star_info['mag_star'][row]    
-    t_baseline = star_info['t_baseline'][row]
     m_star = star_info['m_star'][row]
-    rv_std = star_info['rv_std'][row]
 
     t_rv_abs = np.array([420.0041, 6640.9533]) + 2450000.
     t_ast_abs = 2454786.73611
     t_rv_rel = t_rv_abs - t_ast_abs
-    
-    sep_AU = sep*d_star
-    a_range = np.linspace(21.,80.,10) #np.arange(sep_AU, 50., 15.)
 
-    m_p_range = [17.6415733225, 31.2563360693] # M_jup
+    a_range = np.linspace(21.,80.,10)  #np.arange(sep_AU, 50., 15.)
+
+    m_p_range = [17.6415733225, 31.2563360693]  # M_jup
 
     n_incl = 10
  
@@ -41,7 +37,7 @@ def check_orbits(star = 'hd_36395',sep = 3.51613600, test=False):
             # find minimum inclination that could have the detected separation: i must be between 90 deg and this
             i_min = (np.pi/2 - np.arcsin((sep*d_star)/a))*(180./np.pi)  # hmm, I'm not sure which a should go in here...
 
-            i_range = np.linspace(i_min+0.5, 90., n_incl) #np.arange(i_min, 90., 5.)  # degrees
+            i_range = np.linspace(i_min+0.5, 90., n_incl)  # np.arange(i_min, 90., 5.)  # degrees
 
             if test:
                 print i_min
@@ -60,9 +56,9 @@ def check_orbits(star = 'hd_36395',sep = 3.51613600, test=False):
                                                               e=e, P=p, t0=0, i=i, w=0., o=0., m_p=m_p, m_star=m_star,
                                                               d_star=d_star,
                                                               units = 'arcsec')
-                
 
-                # only need rv diff, because the RV baseline is much shorter than the orbital period for a > sep_AU ~ 20
+                # only need rv diff,
+                # because the RV baseline is much shorter than the orbital period for a > sep_AU ~ 20
                 # i.e., no chance of getting a turning point!
 
                 if test:

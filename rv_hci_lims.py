@@ -12,17 +12,27 @@ from plotting.usetextrue import *
 import orbits.kepler as k
 from plotting.plot_contrastcurve import calc_limitingmass
 
-#rootDir = '/data/ipa/meyer/boehlea/data/'
+# rootDir = '/data/ipa/meyer/boehlea/data/'
 rootDir = '/Volumes/ipa/meyer/boehlea/data/'
 
 dataDirs = {'tau_ceti': 'tau_ceti_lprime/data_with_raw_calibs_newpipeline/',
             '40_eri': '40eri_lprime_081116/data_with_raw_calibs/',
             'axmic': 'axmic_lprime_091011/data_with_raw_calibs/',
             'kapteyns': 'kapteyns_lprime_081116/data_with_raw_calibs_fmenti/',
-            'hd36395':'hd36395_lprime_081116/data_with_raw_calibs_fmenti/',
-            'hd42581':'hd42581_lprime_081116/data_with_raw_calibs/'}
+            'hd36395': 'hd36395_lprime_081116/data_with_raw_calibs_fmenti/',
+            'hd42581': 'hd42581_lprime_081116/data_with_raw_calibs/'}
+
 
 def get_rv_epochs(star):
+    """
+    Find the times in JD of the RV observations for the inputed star.
+
+    :param star: name of star
+    :type star: str
+
+    :return: array of epochs of RV observations in JD
+    :rtype: ndarray
+    """
     
     rvDir = '/Users/annaboehle/research/data/rv/dace/nightly_binning'
 
@@ -30,14 +40,35 @@ def get_rv_epochs(star):
     rv_epochs = []
     for f in file_ls:
         rv_tab = ascii.read(f)
-        #rv_epochs.append(ascii.read(f))
+        # rv_epochs.append(ascii.read(f))
         rv_epochs.extend(rv_tab['rjd'][1:])
 
     print 'Number of RV epochs:',len(np.array(rv_epochs,dtype=float))
         
     return np.array(rv_epochs,dtype=float) + 2400000
 
+
 def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
+    """
+    Make a function that maps the projected separation to the mass limit for a given star and its parameters,
+    and for a given set of PSF subtraction parameters.
+
+    :param star: name of star
+    :type star: str
+    :param d_star: distance of star in pc
+    :type d_star: float
+    :param age_star: age of star in Gyr
+    :type age_star: float
+    :param mag_star: apparent magnitude of star in the L' band
+    :type mag_star: float
+    :param stack: number of frames stacked together before PSF subtraction
+    :type stack: int
+    :param n: number of PCA components used to model PSF
+    :type n: int
+
+    :return: function mapping projected separation to mass limit, measured separations, measured mass limits
+    :rtype: function, ndarray, ndarray
+    """
 
     # get contrast limits versus projected sep for star
     f = h5py.File(rootDir + dataDirs[star] + 'PynPoint_database.hdf5','r')
@@ -63,13 +94,33 @@ def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
     f_masslimvsep = scipy.interpolate.interp1d(seps,mass_lims,bounds_error=False,fill_value=np.inf)  # outside bounds planets cannot be detected!
 
     return f_masslimvsep, seps, mass_lims
-    
+
+
 def sample_orbits(star,
-                  age = 'nominal',
-                  nsamples = 10000,
+                  age='nominal',
+                  nsamples=10000,
                   test=True,
                   plot_text=False,
                   fig_ax_ls=[]):
+    """
+    Combine the HCI and RV constraints and find the percentage of planets detected with each method
+    using a Monte Carlo analysis.
+
+    :param star: name of star
+    :type star: str
+    :param age: age of the star to use for determining the mass limit (either 'nominal','min', or 'max')
+    :type age: str
+    :param nsamples: number of sample to perform for the Monte Carlo
+    :type nsamples: int
+    :param test: if True, only the hard-coded mass and semi-major axis are tested and
+                 figures are plotted showing the samples for various combination of orbital parameters
+    :type test: bool
+    :param plot_text: if True, then include text on the plot to indicate the % of detected orbits in each mass/a bin
+    :type plot_text: bool
+    :param fig_ax_ls: list of figure and axes to plot the results on [fig, ax1, ax2, ax3, ax4]
+    :type fig_ax_ls: list
+
+    """
 
     # read in info tables
     star_info = ascii.read('/Users/annaboehle/research/code/directimaging_code/plotting/nearest_solar_dist_age.txt')
