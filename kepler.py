@@ -253,6 +253,33 @@ def orbit_solution(t_or_E, e, P, t0, i, w, o, m_p, m_star, d_star, units = 'arcs
     return (A*X + F*Y), (B*X + G*Y), K*(np.cos(w+f) + e*np.cos(w))
 
 
+def rv_curve(t, e, P, t0, w, K):
+    """
+    Function to return a model RV curve.
+
+    :param t: Array of times in JD (same length as E)
+    :type t: ndarray
+    :param e: orbital eccentricity
+    :type e: float
+    :param P: orbital period in days
+    :type P: float
+    :param t0: time of closest approach in JD
+    :type t0: float
+    :param w: argument of periapse in degrees (little omega)
+    :type w: float
+    :param K: semi-amplitude of RV signal
+    :type K: float
+
+    :return: predicted RV for all the input times t
+    :rtype: ndarray
+    """
+
+    E = solve_kepler_eqn(t, e, P, t0)
+    f = true_anomaly(E, e)
+
+    return K*(np.cos(w+f) + e*np.cos(w))
+
+
 def angular_sep_f(f, e, P, i, w, m_p, m_star, d_star):
     """
     Find angular separation versus the true anomaly for a give set of orbital parameters.
