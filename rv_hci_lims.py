@@ -23,6 +23,7 @@ dataDirs = {'tau_ceti': 'tau_ceti_lprime/data_with_raw_calibs_newpipeline/',
             'hd42581': 'hd42581_lprime_081116/data_with_raw_calibs/'}
 
 
+# idea: read in the full calibrated RV time series, calculate standard deviation from that in the code below!
 def get_rv_epochs(star):
     """
     Find the times in JD of the RV observations for the inputed star.
@@ -101,7 +102,11 @@ def sample_orbits(star,
                   nsamples=10000,
                   test=True,
                   plot_text=False,
-                  fig_ax_ls=[]):
+                  fig_ax_ls=[],
+                  star_info = {},
+                  t_hci = None,
+                  f_masslimvsep = None,
+                  seps = None):
     """
     Combine the HCI and RV constraints and find the percentage of planets detected with each method
     using a Monte Carlo analysis.
@@ -113,6 +118,7 @@ def sample_orbits(star,
     :param nsamples: number of sample to perform for the Monte Carlo
     :type nsamples: int
     :param test: if True, only the hard-coded mass and semi-major axis are tested and
+
                  figures are plotted showing the samples for various combination of orbital parameters
     :type test: bool
     :param plot_text: if True, then include text on the plot to indicate the % of detected orbits in each mass/a bin
@@ -123,17 +129,14 @@ def sample_orbits(star,
     """
 
     # read in info tables
-    star_info = ascii.read('/Users/annaboehle/research/code/directimaging_code/plotting/nearest_solar_dist_age.txt')
-    contrInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/contr_info.dat')
-    obsInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/NACO_obs.dat')
-    
+    if not star_info:
+        star_info = ascii.read('/Users/annaboehle/research/code/directimaging_code/plotting/nearest_solar_dist_age.txt')
+        row = np.where(star_info['object_name'] == star)[0][0]
+    else:
+        row = 0
+
     # get star info
     print star
-    row_contr = np.where(contrInfo['name'] == star)[0][0]
-    
-    stack, p = contrInfo['stack'][row_contr],contrInfo['percen_frames'][row_contr]
-    
-    row = np.where(star_info['object_name'] == star)[0][0]
     
     d_star = star_info['dist'][row]
     if age == 'nominal':
@@ -149,14 +152,24 @@ def sample_orbits(star,
     m_star = star_info['m_star'][row]
     rv_std = star_info['rv_std'][row]
 
-    row_obs = np.where(obsInfo['name'] == star)[0][0]
-    
     t_rv = get_rv_epochs(star)
-    t_hci = obsInfo['time'][row_obs]
-    n = int(np.round(p*obsInfo['nframes'][row_obs]/stack))
+    if not t_hci:
+        obsInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/NACO_obs.dat')
+        row_obs = np.where(obsInfo['name'] == star)[0][0]
+        t_hci = obsInfo['time'][row_obs]
 
-    # get mass limits v projected sep for star
-    f_masslimvsep, seps, mass_lims = get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n)
+    if not f_masslimvsep:
+        obsInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/NACO_obs.dat')
+        row_obs = np.where(obsInfo['name'] == star)[0][0]
+
+        contrInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/contr_info.dat')
+        row_contr = np.where(contrInfo['name'] == star)[0][0]
+
+        stack, p = contrInfo['stack'][row_contr], contrInfo['percen_frames'][row_contr]
+        n = int(np.round(p * obsInfo['nframes'][row_obs] / stack))
+
+        # get mass limits v projected sep for star
+        f_masslimvsep, seps, mass_lims = get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n)
     
     # fix orbital parameters to 0
     e, o, t0 = 0., 0., 0.
