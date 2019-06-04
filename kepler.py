@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import astropy.constants as const
 import scipy
+from scipy import optimize
 
 
 def kepler_eqn(E, t, e, P, t0):
@@ -399,7 +400,7 @@ def f_from_angularsep(sep_meas, e, P, i, w, m_p, m_star, d_star, test=False):
     diff = theta_sign[1:] - theta_sign[0:-1]
     
     if len(np.where(diff != 0)[0]) >= 1:
-        root = scipy.optimize.fsolve(func_theta, f_range[np.where(diff != 0)], args=(sep_meas, e, P, i, w, m_p, m_star, d_star))
+        root = optimize.fsolve(func_theta, f_range[np.where(diff != 0)], args=(sep_meas, e, P, i, w, m_p, m_star, d_star))
     else:
         raise ValueError('For inputted orbital parameters, angular separation is never reached!')
 
