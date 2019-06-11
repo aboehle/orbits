@@ -24,6 +24,33 @@ dataDirs = {'tau_ceti': 'tau_ceti_lprime/data_with_raw_calibs_newpipeline/',
 
 
 # idea: read in the full calibrated RV time series, calculate standard deviation from that in the code below!
+def get_rv_timeseries(star):
+    """
+    Find the times in JD of the RV observations for the inputed star.
+
+    :param star: name of star
+    :type star: str
+
+    :return: tuple with array of epochs of RV observations in JD and array of calibrated RV measurements
+    :rtype: (ndarray,ndarray)
+    """
+
+    rvDir = '/Users/annaboehle/research/analysis/archival_stars/rv_calibrated'
+
+    file_ls = glob.glob('{:s}/{:s}/{:s}*cal.dat'.format(rvDir, star, star))
+    rv_epochs = []
+    rv_meas = []
+    for f in file_ls:
+        rv_tab = ascii.read(f,names=('rjd','vrad'))
+        # rv_epochs.append(ascii.read(f))
+        rv_epochs.extend(rv_tab['rjd'][:])
+        rv_meas.extend(rv_tab['vrad'][:])
+
+    print 'Number of RV epochs:', len(np.array(rv_epochs, dtype=float))
+
+    return np.array(rv_epochs, dtype=float) + 2400000, np.array(rv_meas)
+
+
 def get_rv_epochs(star):
     """
     Find the times in JD of the RV observations for the inputed star.
@@ -150,9 +177,12 @@ def sample_orbits(star,
     
     mag_star = star_info['mag_star'][row]
     m_star = star_info['m_star'][row]
-    rv_std = star_info['rv_std'][row]
+    #rv_std = star_info['rv_std'][row]
 
-    t_rv = get_rv_epochs(star)
+    t_rv, rv_meas = get_rv_timeseries(star)
+    rv_std = np.std(rv_meas,ddof=1)
+    print '{:s}: rv_std = {:1.2f} m/s'.format(star,rv_std)
+
     if not t_hci:
         obsInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/NACO_obs.dat')
         row_obs = np.where(obsInfo['name'] == star)[0][0]
@@ -166,7 +196,7 @@ def sample_orbits(star,
         row_contr = np.where(contrInfo['name'] == star)[0][0]
 
         stack, p = contrInfo['stack'][row_contr], contrInfo['percen_frames'][row_contr]
-        n = int(np.round(p * obsInfo['nframes'][row_obs] / stack))
+        n = int(np.round(p * obsInfo['nframes_used'][row_obs] / stack))
 
         # get mass limits v projected sep for star
         f_masslimvsep, seps, mass_lims = get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n)
