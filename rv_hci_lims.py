@@ -284,15 +284,15 @@ def sample_orbits(star,
     
             # get rv prediction
             x_rv, y_rv, rv_rv = k.orbit_solution(E_rv,
-                                         e=e, P=P, t0=t0, i=i, w=w, o=o, m_p=m_p, m_star=m_star,d_star=d_star,
-                                         units = 'arcsec',
-                                         solve_kepler=False)
+                                                 e=e, P=P, t0=t0, i=i, w=w, o=o, m_p=m_p, m_star=m_star,d_star=d_star,
+                                                 units = 'arcsec',
+                                                 solve_kepler=False)
     
             # find astrometric location for these parameters
             x_ast, y_ast, rv_ast = k.orbit_solution(E_hci,
-                                            e=e, P=P, t0=t0, i=i, w=w, o=o, m_p=m_p, m_star=m_star,d_star=d_star,
-                                            units = 'arcsec',
-                                            solve_kepler=False)
+                                                    e=e, P=P, t0=t0, i=i, w=w, o=o, m_p=m_p, m_star=m_star,d_star=d_star,
+                                                    units = 'arcsec',
+                                                    solve_kepler=False)
 
             # get frac detected for imaging
             proj_sep = (x_ast.flatten()**2. + y_ast.flatten()**2.)**0.5

@@ -87,12 +87,12 @@ def solve_kepler_eqn(t, e, P, t0, tol=1e-12, test=False):
 def true_anomaly(E, e):
     """
     :param E: Array of eccentric anomalies in radians
-    :type E: ndarray
+    :type E: np.ndarray
     :param e: orbital eccentricity
     :type e: float
 
     :return: true anomaly
-    :rtype: ndarray
+    :rtype: np.ndarray
     """
 
     f = 2*np.arctan(np.sqrt((1 + e) / (1 - e))*np.tan(E/2.))
