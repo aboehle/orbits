@@ -133,7 +133,8 @@ def sample_orbits(star,
                   star_info = {},
                   t_hci = None,
                   f_masslimvsep = None,
-                  seps = None):
+                  seps = None,
+                  calc_rv_std=True):
     """
     Combine the HCI and RV constraints and find the percentage of planets detected with each method
     using a Monte Carlo analysis.
@@ -179,8 +180,12 @@ def sample_orbits(star,
     m_star = star_info['m_star'][row]
     #rv_std = star_info['rv_std'][row]
 
-    t_rv, rv_meas = get_rv_timeseries(star)
-    rv_std = np.std(rv_meas,ddof=1)
+    if calc_rv_std:
+        t_rv, rv_meas = get_rv_timeseries(star)
+        rv_std = np.std(rv_meas,ddof=1)
+    else:
+        t_rv = get_rv_epochs(star)
+        rv_std = star_info['rv_std'][row]
     print '{:s}: rv_std = {:1.2f} m/s'.format(star,rv_std)
 
     if not t_hci:
@@ -263,6 +268,7 @@ def sample_orbits(star,
     
     #out_arr = np.zeros((len(m_p_arr)*len(a_arr), ))  # cols: a, m_p, frac_hci, frac_rv, frac_hciorrv, frac_hcinotrv
     out_arr = []
+    print type(m_star)
     
     for a in a_arr:
         for m_p in m_p_arr:

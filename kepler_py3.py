@@ -79,7 +79,7 @@ def solve_kepler_eqn(t, e, P, t0, tol=1e-12, test=False):
             plt.axvline(E[i], color=line[0].get_color())
         plt.axhline(0.0,color='black',linestyle='dotted')
 
-        print niter
+        print(niter)
     
     return E
 
@@ -411,7 +411,7 @@ def f_from_angularsep(sep_meas, e, P, i, w, m_p, m_star, d_star, test=False):
     root = root - div*2*np.pi
 
     if test:
-        print 'true anomaly:', root
+        print('true anomaly:', root)
 
         plt.plot(f_range, func_theta(f_range, sep_meas, e, P, i, w, m_p, m_star, d_star))
         for r in root:
@@ -475,7 +475,7 @@ def t_from_angularsep(sep_meas, e, P, t0, i, w, m_p, m_star, d_star, test=True):
     root = root - div*P
     
     if test:
-        print 't:',root
+        print('t:',root)
         
         plt.plot(t_range, theta)
         for r in root:
