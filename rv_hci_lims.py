@@ -13,7 +13,7 @@ import orbits.kepler as k
 from plotting.plot_contrastcurve import calc_limitingmass
 
 # rootDir = '/data/ipa/meyer/boehlea/data/'
-rootDir = '/Volumes/ipa/meyer/boehlea/data/'
+rootDir = '/Volumes/ipa/quanz/user_accounts/aboehle/data/'
 
 dataDirs = {'tau_ceti': 'tau_ceti_lprime/data_with_raw_calibs_newpipeline/',
             '40_eri': '40eri_lprime_081116/data_with_raw_calibs/',
@@ -117,7 +117,7 @@ def get_f_masslimvsep(star, d_star, age_star, mag_star, stack, n):
     # convert contrast limits to mass limits
     mass_lims = np.zeros(len(contr))
     for cc in range(len(contr)):
-        mass_lims[cc],t_model,below,above,t_eff   = calc_limitingmass(d_star, age_star, mag_star, contr[cc], filt="L'", interp_age=True)        
+        mass_lims[cc],t_model,below,above,t_eff = calc_limitingmass(d_star, age_star, mag_star, contr[cc], filt="L'", interp_age=True)
     
     f_masslimvsep = scipy.interpolate.interp1d(seps,mass_lims,bounds_error=False,fill_value=np.inf)  # outside bounds planets cannot be detected!
 
@@ -134,7 +134,8 @@ def sample_orbits(star,
                   t_hci = None,
                   f_masslimvsep = None,
                   seps = None,
-                  calc_rv_std=True):
+                  calc_rv_std=True,
+                  save=True):
     """
     Combine the HCI and RV constraints and find the percentage of planets detected with each method
     using a Monte Carlo analysis.
@@ -189,15 +190,15 @@ def sample_orbits(star,
     print '{:s}: rv_std = {:1.2f} m/s'.format(star,rv_std)
 
     if not t_hci:
-        obsInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/NACO_obs.dat')
+        obsInfo = ascii.read('/Volumes/ipa/quanz/user_accounts/aboehle/my_papers/archival_stars/tables/NACO_obs.dat')
         row_obs = np.where(obsInfo['name'] == star)[0][0]
         t_hci = obsInfo['time'][row_obs]
 
     if not f_masslimvsep:
-        obsInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/NACO_obs.dat')
+        obsInfo = ascii.read('/Volumes/ipa/quanz/user_accounts/aboehle/my_papers/archival_stars/tables/NACO_obs.dat')
         row_obs = np.where(obsInfo['name'] == star)[0][0]
 
-        contrInfo = ascii.read('/Volumes/ipa/meyer/boehlea/my_papers/archival_stars/tables/contr_info.dat')
+        contrInfo = ascii.read('/Volumes/ipa/quanz/user_accounts/aboehle/my_papers/archival_stars/tables/contr_info.dat')
         row_contr = np.where(contrInfo['name'] == star)[0][0]
 
         stack, p = contrInfo['stack'][row_contr], contrInfo['percen_frames'][row_contr]
@@ -508,11 +509,12 @@ def sample_orbits(star,
         ax4.set_xlabel('Companion semi-major axis (AU)')
         fig.text(0.05,0.5,'Companion mass (M$_J$)',rotation=90,horizontalalignment='center',verticalalignment='center')
 
-    # write out results
-    out_arr = np.array(out_arr,dtype=dtype)
-    ascii.write(out_arr, 'hci_rv_lims/{:s}_constraints_{:s}age.dat'.format(star,age),overwrite=True,delimiter='\t')
+    if save:
+        # write out results
+        out_arr = np.array(out_arr,dtype=dtype)
+        ascii.write(out_arr, 'hci_rv_lims/{:s}_constraints_{:s}age.dat'.format(star,age),overwrite=True,delimiter='\t')
     
     plt.show()
     
-    return scalar_map, scalar_map_diff
+    return out_arr, scalar_map, scalar_map_diff
 
