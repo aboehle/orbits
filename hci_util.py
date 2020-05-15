@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.interpolate import interp1d, griddata
-
+from analysis_tools.bbflux import bbflux
+import astropy.units as u
+import astropy.constants as c
 
 def mass_radius_relationship(m_p):
     """
@@ -91,7 +93,41 @@ def calc_contrast_phoenix(m_p, star, filter, age_star, inst='NaCo', model='AMES-
     return contrast
 
 
-#def calc_limitingradius_teq(mag_diff,star,filt):
+def calc_contrast_teq(planet_radius,
+                      r,
+                      star,
+                      albedo=0.3,
+                      extra_heat=0.1):
+    """
+
+
+    :param planet_radius: radius of planet in Earth radii
+    :param r: physical separation of planet in AU
+    :param star: Star instance
+    :param albedo:
+    :param extra_heat:
+    :return:
+    """
+
+    # filter info
+    nband_w1 = 9.8
+    nband_w2 = 12.4
+
+    t_eq = (1.0 + extra_heat) * star.teff * np.sqrt(star.radius*c.R_sun.to('AU').value/(2*r)) * ((1-albedo)**0.25)
+
+    waves = np.arange(nband_w1,nband_w2,0.1)*u.micron
+
+    waves = waves.reshape((len(waves),1))
+    t_eq = np.tile(t_eq,(len(waves),1))
+
+    bb_star = bbflux(star.teff*u.K,waves).value
+    bb_planet = bbflux(t_eq*u.K,waves).value
+
+    bb_ratio = np.sum(bb_planet,axis=0)/np.sum(bb_star,axis=0)
+
+    flux_ratio = bb_ratio * ((planet_radius*c.R_earth)/(star.radius*c.R_sun))**2.0
+
+    return(-2.5*np.log10(flux_ratio.value))
 
 
 def get_model_grid(filt, age_star=None, inst='NaCo',model='AMES-Cond-2000'):

@@ -23,13 +23,17 @@ class Star:
                  dist,
                  age,
                  mags,
-                 mass):
+                 mass,
+                 teff,
+                 radius):
 
         self.name = name
         self.dist = dist
         self.age = age
         self.mags = mags
         self.mass = mass
+        self.teff = teff
+        self.radius = radius
 
     def set_mag(self,
                 band,
@@ -281,6 +285,8 @@ class ContrastModel:
 
     def __init__(self,
                  model_type,
+                 phoenix_model=None,
+                 phoenix_inst=None,
                  ):
 
         if model_type not in ['teq', 'phoenix']:
@@ -290,14 +296,16 @@ class ContrastModel:
 
         self.model_type = model_type
 
+        # hmm doesn't make sense to have these defined for non-phoenix models...
+        self.phoenix_model = 'AMES-Cond-2000'
+        self.phoenix_inst = 'NaCo'
+
     def get_contrast(self,
                      planet,
                      star,
-                     age_type,
-                     filter,
+                     age_type=None,
+                     filter=None,
                      r=None,
-                     phoenix_model=None,
-                     phoenix_inst=None,
                      ):
         """
 
@@ -313,19 +321,17 @@ class ContrastModel:
             raise ValueError("r (physical separation between star and planet) must be given is model_type = 'teq'.")
 
         if self.model_type == 'phoenix':
-            #if phoenix_model is None or phoenix_inst is None:
-            #    raise ValueError("if model_type = 'phoenix' then both phoenix_model and phoenix_inst must be given.")
             contrast = util.calc_contrast_phoenix(planet.mass,
                                                   star,
                                                   filter,
-                                                  star.get_age(age_type))
+                                                  star.get_age(age_type),
+                                                  model=self.phoenix_model,
+                                                  inst=self.phoenix_inst)
 
         elif self.model_type == 'teq':
             contrast = util.calc_contrast_teq(planet.radius,
                                               r,
-                                              star,
-                                              filter)
-
+                                              star)
         return contrast
 
 
@@ -499,15 +505,18 @@ class CompletenessMC:
                     if isinstance(data,ImagingDataSet):
 
                         proj_sep = (x.flatten()**2. + y.flatten()**2.)**0.5
+                        #print(np.min(proj_sep),np.max(proj_sep))
                         rho = 0 # calc from x/y
 
-                        phys_sep = ((x**2. + y**2. + z**2.)**0.5)*self.star.dist
+                        phys_sep = ((x.flatten()**2. + y.flatten()**2. + z.flatten()**2.)**0.5)*self.star.dist
 
                         planet_contrast = self.model.get_contrast(planet, self.star, 'nominal', data.filter, phys_sep)
+                        #print(planet_contrast)
                         #print(data.f_contrast(proj_sep))
 
                         # compare to contrast of data set for proje
                         detection_map[d,:] = planet_contrast < data.f_contrast(proj_sep)#,rho)
+                        #print(hi)
 
                     elif isinstance(data,RVDataSet):
 
