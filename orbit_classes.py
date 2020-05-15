@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import astropy.constants as const
+import hci_util as util
+from scipy.interpolate import interp1d, interp2d
 
 class Star:
     """
@@ -9,7 +11,7 @@ class Star:
     :param dist: distance to star in pc
     :type dist: float
     :param age: tuple of 3 floats giving (minimum, nominal, and maximum) ages of star in Gyr
-    :type age: float
+    :type age: tuple
     :param mags: magnitudes of star in range of bands
     :type mags: dict
     :param mass: mass of star in solar masses
@@ -76,9 +78,7 @@ class Planet:
                  mass):
 
         self.mass = mass
-
-
-    # need some function to get flux!
+        self.radius = util.mass_radius_relationship([mass*const.M_jup/const.M_earth])[0]
 
 
 class Orbit:
@@ -205,11 +205,12 @@ class Orbit:
     def get_orbit_solution(self,
                            times=None,
                            units='arcsec'):
+        """
 
-        #if all(val is None for val in [times, ecc_anomaly]):
-        #    raise ValueError("One of the two parameters of 'time' and 'ecc_anomaly' must be defined.")
-        #elif all(val is not None for val in [times, ecc_anomaly]):
-        #    raise ValueError("Only one of the two parameters of 'time' and 'ecc_anomaly' can be defined.")
+        :param times:
+        :param units: units of output (x, y, AND z)
+        :return:
+        """
 
         # convert masses to solar masses
         m_p_solar = (self.planet.mass / (const.M_sun / const.M_jup)).value
@@ -223,7 +224,6 @@ class Orbit:
             ValueError('ERROR: units parameters must be "AU" or "arcsec"')
 
         # get eccentric anomaly and true anomaly
-        #if ecc_anomaly is None:
         ecc_anomaly = self.solve_kepler_eqn(times)
         f = self.true_anomaly(ecc_anomaly)
 
@@ -254,75 +254,161 @@ class Orbit:
         X = np.cos(ecc_anomaly) - self.e
         Y = (1 - self.e ** 2.) ** 0.5 * np.sin(ecc_anomaly)
 
+        # get physical separation and z
+        r = (a*(1 - self.e**2.))/(1 + self.e*np.cos(f))
+        z = r*(np.sin(f + self.w)*np.sin(self.i))
+
+
         # flipped x and y so the reference direction is along +x direction as in Fig.7 of exoplanets ch. 2
-        return (A * X + F * Y), (B * X + G * Y), K * (np.cos(self.w + f) + self.e * np.cos(self.w))
+        return (A * X + F * Y), (B * X + G * Y), z, K * (np.cos(self.w + f) + self.e * np.cos(self.w))
 
 
 class RVDataSet:
 
     def __init__(self,
                  times,
-                 rv):
+                 rv,
+                 star):
 
         self.times = times
         self.rv = rv
+        self.star = star
 
         self.rv_std = np.std(self.rv, ddof=1)
 
 
+class ContrastModel:
+
+    def __init__(self,
+                 model_type,
+                 ):
+
+        if model_type not in ['teq', 'phoenix']:
+            raise ValueError(
+                f"'model_type' given was {model_type}: must be 'teq' for equilibrium temperature or 'phoenix'" + \
+                                          f" for internal heat from the Phoenix models.")
+
+        self.model_type = model_type
+
+    def get_contrast(self,
+                     planet,
+                     star,
+                     age_type,
+                     filter,
+                     r=None,
+                     phoenix_model=None,
+                     phoenix_inst=None,
+                     ):
+        """
+
+        :param planet:
+        :param star:
+        :param age_type:
+        :param filter:
+        :param r: physical separation between star and planet in AU
+        :return:
+        """
+
+        if self.model_type == 'teq' and r is None:
+            raise ValueError("r (physical separation between star and planet) must be given is model_type = 'teq'.")
+
+        if self.model_type == 'phoenix':
+            #if phoenix_model is None or phoenix_inst is None:
+            #    raise ValueError("if model_type = 'phoenix' then both phoenix_model and phoenix_inst must be given.")
+            contrast = util.calc_contrast_phoenix(planet.mass,
+                                                  star,
+                                                  filter,
+                                                  star.get_age(age_type))
+
+        elif self.model_type == 'teq':
+            contrast = util.calc_contrast_teq(planet.radius,
+                                              r,
+                                              star,
+                                              filter)
+
+        return contrast
+
+
 class ImagingDataSet:
+    """
+    :param time: time of imaging data set in ...
+    :type time: float
+    :param sep: projected separations in arcsec of the contrast
+    :type sep: np.ndarray
+    :param contrast: limiting contrasts for this data set in mag
+    :type contrast: np.ndarray
+    :param star: star that was observed
+    :type star: Star
+    :param filter: filter of observations
+    :type filter: str
+    :param rho:
+    """
 
     def __init__(self,
                  time,
                  sep,
                  contrast,
                  star,
+                 filter,
                  rho=None):
-        """
 
-        :param time:
-        :type time: float
-        :param sep:
-        :param contrast:
-        :param rho:
-        """
 
-        self.times = np.array([time])
+        self.times = np.array([time])  # convert to right units!
         self.star = star
 
-        if contrast.ndims == 1:
+        self.sep = sep
+        self.contrast = contrast
+
+        self.filter = filter
+
+        self.f_contrast = self._interpolate_contrast()
+
+        if rho is not None:
+            self.rho = rho
+
+        if self.contrast.ndim == 1:
             if sep.shape != contrast.shape:
                 raise ValueError("'contrast' and 'sep' must have different shapes: {contrast.shape} and {sep.shape}.")
-            else:
-                pass
 
-        elif contrast.ndims == 2:
+        elif self.contrast.ndim == 2:
             if rho is None:
                 raise ValueError("'contrast' has 2 dimensions, 'rho' must be defined' ")
                 # do things...
-                f_masslimvsep = scipy.interpolate.interp1d(sep, contrast, bounds_error=False, fill_value=np.inf)
+                #f_masslimvsep = scipy.interpolate.interp1d(sep, contrast, bounds_error=False, fill_value=np.inf)
+        else:
+            raise ValueError(f"'contrast' must have either 1 or 2 dimensions.")
 
     @staticmethod
-    def get_sep_rho(contrast_map, pixscale):
+    def get_sep_rho(contrast_map,
+                    pixscale):
         pass
         # return sep, rho 2d with same size as input contrast map
         # this can then be passed into the constructor
 
-    def contrast_to_masslim(self):
-        pass
+    def _interpolate_contrast(self):
+        # could also go in constructor?
+        # could change so that function always takes sep and rho, but just returns the same value for all rhos
+
+        if self.contrast.ndim == 1:
+
+            f_contrast = interp1d(self.sep,
+                                  self.contrast,
+                                  bounds_error=False,
+                                  fill_value=-np.inf)
+
+        else:
+
+            f_contrast = interp2d(self.sep,
+                                  self.rho,
+                                  self.contrast,
+                                  bounds_error=False,
+                                  fill_value=-np.inf)
+
+        return f_contrast
 
         # else:
         #     if contrast.ndims != 1:
         #         raise ValueError("Contrast must be 1d if only seps are given and not rho.")
-
-        # ultimate output needed: a way to go from sep(and rho) to mass limit...
-        # steps:
-        #   (1) convert contrast to mass limit need (star info - now included!), filter of observations, model
-        #   (2) give function that takes sep (and rho) as input and returns mass limit by interpolating over mass limits
-
-    def check_detection(self):
-
-
 
 
 
@@ -332,7 +418,8 @@ class CompletenessMC:
                  mp_arr,
                  a_arr,
                  nsamples,
-                 data_sets):
+                 data_sets,
+                 model=None):
         """
 
         :param mp_arr: array of planet masses in Jupiter masses
@@ -348,6 +435,8 @@ class CompletenessMC:
 
         self.nsamples = nsamples
 
+        self.model = model
+
         # check that the data sets all have the same star
         if len(data_sets) == 0:
             raise ValueError("Must include at least one data set (ImagingDataSet or RVDataSet).")
@@ -357,6 +446,8 @@ class CompletenessMC:
                 if data.star != self.star:
                     raise ValueError(f"data set {data} does not have the same star as first data set {data_sets[0]}")
 
+        # sample orbital parameters
+
         # set fixed orbital parameters to 0
         self.e, self.o, self.t0 = 0., 0., 0.  # self.o needs to be sampled for 2d contrast map
 
@@ -365,6 +456,8 @@ class CompletenessMC:
         self.i = np.arccos(unif) * (180. / np.pi)
 
         self.w = np.random.uniform(size=self.nsamples, low=0, high=360.)
+
+        # another check: that any imaging sets filters have corresponding magnitudes in the Star instances
 
 
     def run(self):
@@ -401,16 +494,20 @@ class CompletenessMC:
                     #ecc_anomaly = orbit_set.solve_kepler_eqn(data.times)
                     # need to add error in that function if certain values in orbit are arrays
 
-                    x, y, rv = orbit_set.get_orbit_solution(data.times)
+                    x, y, z, rv = orbit_set.get_orbit_solution(data.times)
 
                     if isinstance(data,ImagingDataSet):
 
-                        sep = (x.flatten()**2. + y.flatten()**2.)**0.5
-                        rho = 0
+                        proj_sep = (x.flatten()**2. + y.flatten()**2.)**0.5
+                        rho = 0 # calc from x/y
 
-                        mass_lims = data.masslim_v_sep_rho(sep,rho) # mass lims at any (sep, rho) pair
+                        phys_sep = ((x**2. + y**2. + z**2.)**0.5)*self.star.dist
 
-                        detection_map[d,:] = m_p > mass_lims
+                        planet_contrast = self.model.get_contrast(planet, self.star, 'nominal', data.filter, phys_sep)
+                        #print(data.f_contrast(proj_sep))
+
+                        # compare to contrast of data set for proje
+                        detection_map[d,:] = planet_contrast < data.f_contrast(proj_sep)#,rho)
 
                     elif isinstance(data,RVDataSet):
 
@@ -423,8 +520,8 @@ class CompletenessMC:
 
                     completeness_map[d,i,j] = len(np.where(detection_map[d,:])[0])/float(self.nsamples)
 
-                    if completeness_map[d,i,j] != 0:
-                        print(f"(a, m_p) = ({a}, {planet.mass}): {completeness_map[d,i,j]}")
+                    # if completeness_map[d,i,j] != 0:
+                    #     print(f"(a, m_p) = ({a}, {planet.mass}): {completeness_map[d,i,j]}")
 
                 if len(self.data_sets) > 1:
                     print(detection_map[1])
