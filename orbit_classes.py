@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import astropy.constants as const
-import hci_util as util
-from scipy.interpolate import interp1d, interp2d
+import orbits.hci_util as util
+from scipy.interpolate import interp1d, griddata
 
 class Star:
     """
@@ -339,46 +339,49 @@ class ImagingDataSet:
     """
     :param time: time of imaging data set in ...
     :type time: float
-    :param sep: projected separations in arcsec of the contrast
-    :type sep: np.ndarray
     :param contrast: limiting contrasts for this data set in mag
     :type contrast: np.ndarray
     :param star: star that was observed
     :type star: Star
     :param filter: filter of observations
     :type filter: str
-    :param rho:
+    :param sep: projected separations in arcsec of the contrast
+    :type sep: np.ndarray
+    :param pos: tuple of x and y positions of each pixel in 2D contrast, relative to star
+    :type pos: tuple of np.ndarray
     """
 
     def __init__(self,
                  time,
-                 sep,
                  contrast,
                  star,
                  filter,
-                 rho=None):
+                 sep=None,
+                 pos=None):
 
 
         self.times = np.array([time])  # convert to right units!
         self.star = star
 
         self.sep = sep
+        self.pos = pos
         self.contrast = contrast
 
         self.filter = filter
 
+        self.ndim = contrast.ndim
+
         self.f_contrast = self._interpolate_contrast()
 
-        if rho is not None:
-            self.rho = rho
+        if self.ndim == 1:
+            if sep is None:
+                raise ValueError("For 1D 'contrast', 'sep' must be defined.")
+            elif sep.shape != contrast.shape:
+                raise ValueError(f"'contrast' and 'sep' must have different shapes: {contrast.shape} and {sep.shape}.")
 
-        if self.contrast.ndim == 1:
-            if sep.shape != contrast.shape:
-                raise ValueError("'contrast' and 'sep' must have different shapes: {contrast.shape} and {sep.shape}.")
-
-        elif self.contrast.ndim == 2:
-            if rho is None:
-                raise ValueError("'contrast' has 2 dimensions, 'rho' must be defined' ")
+        elif self.ndim == 2:
+            if pos is None:
+                raise ValueError("For 2D 'contrast', 'pos' must be defined.")
                 # do things...
                 #f_masslimvsep = scipy.interpolate.interp1d(sep, contrast, bounds_error=False, fill_value=np.inf)
         else:
@@ -403,12 +406,13 @@ class ImagingDataSet:
                                   fill_value=-np.inf)
 
         else:
+            idx = np.where(self.contrast != self.contrast)
+            self.contrast[idx] = -np.inf
 
-            f_contrast = interp2d(self.sep,
-                                  self.rho,
-                                  self.contrast,
-                                  bounds_error=False,
-                                  fill_value=-np.inf)
+            f_contrast = lambda x, y: griddata((self.pos[0].flatten(),self.pos[1].flatten()),
+                                               self.contrast.flatten(),
+                                               (x,y),
+                                               method='nearest')
 
         return f_contrast
 
@@ -511,11 +515,13 @@ class CompletenessMC:
                         phys_sep = ((x.flatten()**2. + y.flatten()**2. + z.flatten()**2.)**0.5)*self.star.dist
 
                         planet_contrast = self.model.get_contrast(planet, self.star, 'nominal', data.filter, phys_sep)
-                        #print(planet_contrast)
                         #print(data.f_contrast(proj_sep))
 
                         # compare to contrast of data set for proje
-                        detection_map[d,:] = planet_contrast < data.f_contrast(proj_sep)#,rho)
+                        if data.ndim == 1:
+                            detection_map[d,:] = planet_contrast < data.f_contrast(proj_sep)#,rho)
+                        elif data.ndim == 2:
+                            detection_map[d, :] = planet_contrast < data.f_contrast(x.flatten(),y.flatten())  # ,rho)
                         #print(hi)
 
                     elif isinstance(data,RVDataSet):

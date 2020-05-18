@@ -4,6 +4,7 @@ from analysis_tools.bbflux import bbflux
 import astropy.units as u
 import astropy.constants as c
 
+
 def mass_radius_relationship(m_p):
     """
     :param m_p: mass of planets in Earth masses
@@ -24,6 +25,57 @@ def mass_radius_relationship(m_p):
     rad[high_m] = r0*(m_p[high_m]/m0)**0.01
     
     return rad
+
+
+def radius_mass_relationship(r_p):
+    """
+    :param r_p: radius of planets in Earth radii
+    :type r_p: np.ndarray
+
+    :returns rad: radius of planets in Earth radii
+    """
+
+    r_p = np.asarray(r_p)
+    m_p = np.zeros(r_p.shape)
+
+    m0, r0 = 124, 12.1
+
+    low_r = np.where(r_p < r0)
+    high_r = np.where(r_p >= r0)
+
+    m_p[low_r] = m0 * (r_p[low_r] / r0) ** (1/0.55)
+    m_p[high_r] = m0 * (r_p[high_r] / r0) ** (1/0.01)
+
+    return m_p
+
+
+def get_sep_rho(contr_map, pixscale):
+
+    # get center of map
+    x0, y0 = (contr_map.shape[1]-1)/2.0, (contr_map.shape[0]-1)/2.0
+
+    xcoord = np.arange(contr_map.shape[1]) - x0
+    ycoord = np.arange(contr_map.shape[0]) - y0
+
+    X, Y = np.meshgrid(xcoord, ycoord)
+
+    sep = pixscale * (X**2.0 + Y**2.0)**0.5
+    rho = (np.arctan2(Y, X) * (180. / np.pi) - 90.) % 360
+
+    return sep, rho
+
+
+def get_xy(contr_map, pixscale):
+
+    # get center of map
+    x0, y0 = (contr_map.shape[1]-1)/2.0, (contr_map.shape[0]-1)/2.0
+
+    xcoord = np.arange(contr_map.shape[1]) - x0
+    ycoord = np.arange(contr_map.shape[0]) - y0
+
+    X, Y = np.meshgrid(xcoord, ycoord)
+
+    return pixscale*X, pixscale*Y
 
 
 def calc_limitingmass_phoenix(mag_diff,star,filt,age_star,interp_age=True):
