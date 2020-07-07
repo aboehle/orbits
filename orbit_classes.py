@@ -88,11 +88,11 @@ class Planet:
 
         elif radius is None:
             self.mass = mass
-            self.radius = util.mass_radius_relationship([mass*const.M_jup/const.M_earth])[0]
+            self.radius = util.mass_radius_relationship([mass*(const.M_jup/const.M_earth).value])[0]
 
         elif mass is None:
             self.radius = radius
-            self.mass = util.radius_mass_relationship([radius])[0]*const.M_earth/const.M_jup
+            self.mass = util.radius_mass_relationship([radius])[0]*(const.M_earth/const.M_jup).value
 
         else:
             self.mass = mass
@@ -441,21 +441,33 @@ class ImagingDataSet:
 
 
 class CompletenessMC:
+    """
+    :param mp_arr: array of planet masses in Jupiter masses
+    :param rp_arr: array of planet masses in Earth radii
+    :param a_arr: array of semi-major axes in AU
+    :param nsamples: number of MC samples per planet mass/semi-major axis pair
+    """
 
     def __init__(self,
-                 mp_arr,
                  a_arr,
                  nsamples,
                  data_sets,
+                 mp_arr=None,
+                 rp_arr=None,
                  model=None):
-        """
 
-        :param mp_arr: array of planet masses in Jupiter masses
-        :param a_arr: array of semi-major axes in AU
-        :param nsamples: number of MC samples per planet mass/semi-major axis pair
-        """
+        if mp_arr is None and rp_arr is None:
+            raise ValueError("Either mp_arr or rp_arr must be defined.")
 
-        self.mp_arr = np.asarray(mp_arr)
+        elif mp_arr is not None and rp_arr is not None:
+            raise ValueError("Only one of mp_arr or rp_arr can be defined.")
+
+        elif mp_arr is not None:
+            self.p_ls = [Planet(mass=mp) for mp in mp_arr]
+
+        else:
+            self.p_ls = [Planet(radius=rp) for rp in rp_arr]
+
         self.a_arr = np.asarray(a_arr)
 
         self.data_sets = data_sets
@@ -493,16 +505,15 @@ class CompletenessMC:
         """
         Derive the completeness map for each planet mass/semi-major axis combination.
 
-        :return: completeness_map (array for each combination of values in mp_arr and a_arr,
+        :return: completeness_map (array for each combination of values in p_ls and a_arr,
         """
 
         if len(self.data_sets) > 1:
-            completeness_map = np.zeros((len(self.data_sets) + 2,len(self.mp_arr),len(self.a_arr)))
+            completeness_map = np.zeros((len(self.data_sets) + 2,len(self.p_ls),len(self.a_arr)))
         else:
-            completeness_map = np.zeros((len(self.data_sets),len(self.mp_arr), len(self.a_arr)))
+            completeness_map = np.zeros((len(self.data_sets),len(self.p_ls), len(self.a_arr)))
 
-        for i, m_p in enumerate(self.mp_arr):
-            planet = Planet(m_p)
+        for i, planet in enumerate(self.p_ls):
 
             for j, a in enumerate(self.a_arr):
 
