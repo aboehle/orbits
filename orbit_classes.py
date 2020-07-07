@@ -208,7 +208,8 @@ class Orbit:
 
     def get_orbit_solution(self,
                            times=None,
-                           units='arcsec'):
+                           units='arcsec',
+                           exact_total_mass=True):
         """
 
         :param times:
@@ -217,7 +218,10 @@ class Orbit:
         """
 
         # convert masses to solar masses
-        m_p_solar = (self.planet.mass / (const.M_sun / const.M_jup)).value
+        if exact_total_mass:
+            m_p_solar = (self.planet.mass / (const.M_sun / const.M_jup)).value
+        else:
+            m_p_solar = 0.0
 
         # convert p to a (semi-major axis for relative orbit - for astrometric orbit)
         a = ((self.star.mass + m_p_solar) * (self.p / 365.) ** 2.) ** (1. / 3)  # in AU
@@ -470,7 +474,8 @@ class CompletenessMC:
         # another check: that any imaging sets filters have corresponding magnitudes in the Star instances
 
 
-    def run(self):
+    def run(self,
+            exact_total_mass=True):
         """
         Derive the completeness map for each planet mass/semi-major axis combination.
 
@@ -487,7 +492,10 @@ class CompletenessMC:
 
             for j, a in enumerate(self.a_arr):
 
-                p = np.sqrt(a ** 3. / (self.star.mass + planet.mass * 954.7919e-6)) * 365.
+                if exact_total_mass:
+                    p = np.sqrt(a ** 3. / (self.star.mass + planet.mass * 954.7919e-6)) * 365.
+                else:
+                    p = np.sqrt(a ** 3. / (self.star.mass)) * 365.
 
                 orbit_set = Orbit(self.e,
                                   p,
@@ -504,7 +512,7 @@ class CompletenessMC:
                     #ecc_anomaly = orbit_set.solve_kepler_eqn(data.times)
                     # need to add error in that function if certain values in orbit are arrays
 
-                    x, y, z, rv = orbit_set.get_orbit_solution(data.times)
+                    x, y, z, rv = orbit_set.get_orbit_solution(data.times,exact_total_mass=exact_total_mass)
 
                     if isinstance(data,ImagingDataSet):
 
