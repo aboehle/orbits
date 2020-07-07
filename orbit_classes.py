@@ -76,13 +76,27 @@ class Star:
 class Planet:
     """
     :param mass: mass of planet in Jupiter masses
+    :param radius: radius of planet in Earth radii
     """
 
     def __init__(self,
-                 mass):
+                 mass=None,
+                 radius=None):
 
-        self.mass = mass
-        self.radius = util.mass_radius_relationship([mass*const.M_jup/const.M_earth])[0]
+        if mass is None and radius is None:
+            raise ValueError("Either planet mass or radius must be defined.")
+
+        elif radius is None:
+            self.mass = mass
+            self.radius = util.mass_radius_relationship([mass*const.M_jup/const.M_earth])[0]
+
+        elif mass is None:
+            self.radius = radius
+            self.mass = util.radius_mass_relationship([radius])[0]*const.M_earth/const.M_jup
+
+        else:
+            self.mass = mass
+            self.radius = radius
 
 
 class Orbit:

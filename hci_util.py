@@ -39,12 +39,19 @@ def radius_mass_relationship(r_p):
     m_p = np.zeros(r_p.shape)
 
     m0, r0 = 124, 12.1
+    m_max = 1660  # max mass for planets in paper
+    r_max = r0*(m_max/m0)**0.01
 
     low_r = np.where(r_p < r0)
-    high_r = np.where(r_p >= r0)
+    high_r = np.where( (r_p >= r0) & (r_p < r_max))
+    invalid_r = np.where(r_p >= r_max)
+
+    if len(invalid_r[0]) > 0:
+        print(f"Warning: mass is not well defined for radii > {r_max:1.1f}, so a mass of {m_max} Earth masses is assumed.")
 
     m_p[low_r] = m0 * (r_p[low_r] / r0) ** (1/0.55)
     m_p[high_r] = m0 * (r_p[high_r] / r0) ** (1/0.01)
+    m_p[invalid_r] = m_max
 
     return m_p
 
