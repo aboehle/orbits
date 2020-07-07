@@ -303,8 +303,10 @@ class ContrastModel:
 
     def __init__(self,
                  model_type,
-                 phoenix_model=None,
-                 phoenix_inst=None,
+                 phoenix_model='AMES-Cond-2000',
+                 phoenix_inst='NaCo',
+                 albedo=0.3,
+                 extra_heat=0.1
                  ):
 
         if model_type not in ['teq', 'phoenix']:
@@ -315,8 +317,12 @@ class ContrastModel:
         self.model_type = model_type
 
         # hmm doesn't make sense to have these defined for non-phoenix models...
-        self.phoenix_model = 'AMES-Cond-2000'
-        self.phoenix_inst = 'NaCo'
+        self.phoenix_model = phoenix_model
+        self.phoenix_inst = phoenix_inst
+
+        # of these for non-teq models...
+        self.albedo=albedo
+        self.extra_heat = extra_heat
 
     def get_contrast(self,
                      planet,
@@ -349,7 +355,9 @@ class ContrastModel:
         elif self.model_type == 'teq':
             contrast = util.calc_contrast_teq(planet.radius,
                                               r,
-                                              star)
+                                              star,
+                                              albedo=self.albedo,
+                                              extra_heat=self.extra_heat)
         return contrast
 
 
