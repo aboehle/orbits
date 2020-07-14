@@ -172,6 +172,7 @@ def calc_contrast_teq(planet_radius,
     nband_w1 = 9.8
     nband_w2 = 12.4
 
+    # not sure if this is the most logical way to deal with the extra heat
     t_eq = (1.0 + extra_heat) * star.teff * np.sqrt(star.radius*c.R_sun.to('AU').value/(2*r)) * ((1-albedo)**0.25)
 
     waves = np.arange(nband_w1,nband_w2,0.1)*u.micron

@@ -497,13 +497,14 @@ class CompletenessMC:
         # sample orbital parameters
 
         # set fixed orbital parameters to 0
-        self.e, self.o, self.t0 = 0., 0., 0.  # self.o needs to be sampled for 2d contrast map
+        self.e, self.t0 = 0., 0.
 
-        # sample i and w
+        # sample i, w, and o
         unif = np.random.uniform(size=self.nsamples)
         self.i = np.arccos(unif) * (180. / np.pi)
 
         self.w = np.random.uniform(size=self.nsamples, low=0, high=360.)
+        self.o = np.random.uniform(size=self.nsamples, low=0, high=360.)
 
         # another check: that any imaging sets filters have corresponding magnitudes in the Star instances
 
