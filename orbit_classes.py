@@ -200,7 +200,7 @@ class Orbit:
         niter = 0
         while (np.abs(tol_check) > tol).any():
             # first order
-            E = E - (kepler_eqn(E, times) / (1 - self.e * np.cos(E)))
+            E = E - (kepler_eqn(E, times) / (1 - e * np.cos(E)))
 
             # second order
             # E = E - ( (1 - e*np.cos(E)) / (e*np.sin(E)) )
@@ -221,7 +221,7 @@ class Orbit:
         return E
 
     def get_orbit_solution(self,
-                           times=None,
+                           times,
                            units='arcsec',
                            exact_total_mass=True):
         """
@@ -462,7 +462,11 @@ class CompletenessMC:
                  data_sets,
                  mp_arr=None,
                  rp_arr=None,
-                 model=None):
+                 model=None,
+                 e = None,
+                 i = None,
+                 o = None,
+                 ):
 
         if mp_arr is None and rp_arr is None:
             raise ValueError("Either mp_arr or rp_arr must be defined.")
@@ -497,14 +501,25 @@ class CompletenessMC:
         # sample orbital parameters
 
         # set fixed orbital parameters to 0
-        self.e, self.t0 = 0., 0.
+        self.t0 = 0.
+        if e is None:
+            self.e = 0.
+        else:
+            self.e = e
 
         # sample i, w, and o
-        unif = np.random.uniform(size=self.nsamples)
-        self.i = np.arccos(unif) * (180. / np.pi)
+        if i is None:
+            unif = np.random.uniform(size=self.nsamples)
+            self.i = np.arccos(unif) * (180. / np.pi)
+        else:
+            self.i = i
 
         self.w = np.random.uniform(size=self.nsamples, low=0, high=360.)
-        self.o = np.random.uniform(size=self.nsamples, low=0, high=360.)
+
+        if o is None:
+            self.o = np.random.uniform(size=self.nsamples, low=0, high=360.)
+        else:
+            self.o = o
 
         # another check: that any imaging sets filters have corresponding magnitudes in the Star instances
 
@@ -559,7 +574,7 @@ class CompletenessMC:
                         planet_contrast = self.model.get_contrast(planet, self.star, 'nominal', data.filter, phys_sep)
                         #print(data.f_contrast(proj_sep))
 
-                        # compare to contrast of data set for proje
+                        # compare to contrast of data set for projected separation
                         if data.ndim == 1:
                             detection_map[d,:] = planet_contrast < data.f_contrast(proj_sep)#,rho)
                         elif data.ndim == 2:

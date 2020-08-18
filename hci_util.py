@@ -73,11 +73,22 @@ def get_sep_rho(contr_map, pixscale):
 
 
 def get_xy(contr_map, pixscale):
+    """
+    Array of x values and array of y values for each pixel in contr_map
+    in units of arcseconds relative to the center.
+
+    Assumes N is up (i.e., y increases to the top) and E is to the left (i.e., x increases to the left).
+
+    :param contr_map:
+    :param pixscale:
+    :return:
+    """
 
     # get center of map
     x0, y0 = (contr_map.shape[1]-1)/2.0, (contr_map.shape[0]-1)/2.0
 
-    xcoord = np.arange(contr_map.shape[1]) - x0
+    xcoord = np.flip(np.arange(contr_map.shape[1]) - x0)
+    #xcoord = np.arange(contr_map.shape[1]) - x0
     ycoord = np.arange(contr_map.shape[0]) - y0
 
     X, Y = np.meshgrid(xcoord, ycoord)
