@@ -185,6 +185,9 @@ class Orbit:
         :rtype: ndarray
         """
 
+        # transpose times array
+        times = np.transpose([times])
+
         # array of initial guesses for E's: use the mean anomaly
         # E = np.zeros(len(t))
         E = (2 * np.pi / self.p) * (times - self.t0)
@@ -200,7 +203,7 @@ class Orbit:
         niter = 0
         while (np.abs(tol_check) > tol).any():
             # first order
-            E = E - (kepler_eqn(E, times) / (1 - e * np.cos(E)))
+            E = E - (kepler_eqn(E, times) / (1 - self.e * np.cos(E)))
 
             # second order
             # E = E - ( (1 - e*np.cos(E)) / (e*np.sin(E)) )
@@ -258,20 +261,6 @@ class Orbit:
         K = (28.4329 / (np.sqrt(1 - self.e ** 2.))) * (self.planet.mass * np.sin(self.i)) \
             * (m_p_solar + self.star.mass) ** (-2. / 3) \
             * (self.p / 365.) ** (-1. / 3)
-
-        if isinstance(A, np.ndarray) and isinstance(ecc_anomaly, np.ndarray):
-            len_A = len(A)
-            len_ecc_anomaly = len(ecc_anomaly)
-
-            # tile matrix elements
-            A = np.tile(A, [len_ecc_anomaly, 1])
-            F = np.tile(F, [len_ecc_anomaly, 1])
-            B = np.tile(B, [len_ecc_anomaly, 1])
-            G = np.tile(G, [len_ecc_anomaly, 1])
-
-            # tile time parameters for next calculations
-            ecc_anomaly = np.tile(np.array([ecc_anomaly]).transpose(), [1, len_A])
-            f = np.tile(np.array([f]).transpose(), [1, len_A])
 
         X = np.cos(ecc_anomaly) - self.e
         Y = (1 - self.e ** 2.) ** 0.5 * np.sin(ecc_anomaly)
@@ -501,7 +490,6 @@ class CompletenessMC:
         # sample orbital parameters
 
         # set fixed orbital parameters to 0
-        self.t0 = 0.
         if e is None:
             self.e = 0.
         else:
@@ -514,6 +502,10 @@ class CompletenessMC:
         else:
             self.i = i
 
+        self.t0 = lambda p: np.random.uniform(size=self.nsamples, low=0., high = p)
+        #if (np.array([self.e]) == 0.).all():
+        #    self.w = 0.
+        #else:
         self.w = np.random.uniform(size=self.nsamples, low=0, high=360.)
 
         if o is None:
@@ -548,7 +540,7 @@ class CompletenessMC:
 
                 orbit_set = Orbit(self.e,
                                   p,
-                                  self.t0,
+                                  self.t0(p),
                                   self.i,
                                   self.w,
                                   self.o,
@@ -566,20 +558,16 @@ class CompletenessMC:
                     if isinstance(data,ImagingDataSet):
 
                         proj_sep = (x.flatten()**2. + y.flatten()**2.)**0.5
-                        #print(np.min(proj_sep),np.max(proj_sep))
-                        rho = 0 # calc from x/y
 
                         phys_sep = ((x.flatten()**2. + y.flatten()**2. + z.flatten()**2.)**0.5)*self.star.dist
 
                         planet_contrast = self.model.get_contrast(planet, self.star, 'nominal', data.filter, phys_sep)
-                        #print(data.f_contrast(proj_sep))
 
                         # compare to contrast of data set for projected separation
                         if data.ndim == 1:
                             detection_map[d,:] = planet_contrast < data.f_contrast(proj_sep)#,rho)
                         elif data.ndim == 2:
                             detection_map[d, :] = planet_contrast < data.f_contrast(x.flatten(),y.flatten())  # ,rho)
-                        #print(hi)
 
                     elif isinstance(data,RVDataSet):
 
@@ -596,8 +584,6 @@ class CompletenessMC:
                     #     print(f"(a, m_p) = ({a}, {planet.mass}): {completeness_map[d,i,j]}")
 
                 if len(self.data_sets) > 1:
-                    print(detection_map[1])
-                    print()
 
                     # detected in at least one data set
                     completeness_map[len(self.data_sets),i,j] = len(np.where(np.sum(detection_map,axis=0) > 0)[0]) / float(self.nsamples)
